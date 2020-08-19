@@ -1,92 +1,92 @@
 'use strict';
 
-var axios = require('axios');
-var db = require('./db');
-var API_KEY = process.env.MOONPAY_API_KEY;
+const axios = require('axios');
+const db = require('./db');
+const API_KEY = process.env.MOONPAY_API_KEY;
 
-var PRIORITY_SYMBOLS = ['BTC', 'BCH', 'BSV', 'ETH', 'USDT', 'LTC', 'XRP', 'XLM', 'EOS', 'DOGE', 'DASH'];
+const PRIORITY_SYMBOLS = ['BTC', 'BCH', 'BSV', 'ETH', 'USDT', 'LTC', 'XRP', 'XLM', 'EOS', 'DOGE', 'DASH'];
 
 function save(_id, data) {
-  var collection = db().collection('moonpay');
-  return collection.updateOne({_id: _id}, {$set: {data: data}}, {upsert: true});
+  const collection = db().collection('moonpay');
+  return collection.updateOne({ _id }, { $set: { data } }, { upsert: true });
 }
 
 function getCurrenciesFromAPI() {
   return axios.get('https://api.moonpay.io/v3/currencies', {
     params: {
-      apiKey: API_KEY
-    }
-  }).then(function(response) {
-    var data = response.data;
+      apiKey: API_KEY,
+    },
+  }).then((response) => {
+    const { data } = response;
     if (!data || !data.length) throw new Error('Bad moonpay response');
 
-    var coins = {};
-    var coinsUSA = {};
-    PRIORITY_SYMBOLS.forEach(function(symbol) {
-      var coin = data.find(function(item) {
+    const coins = {};
+    const coinsUSA = {};
+    PRIORITY_SYMBOLS.forEach((symbol) => {
+      const coin = data.find((item) => {
         return item.code === symbol.toLowerCase();
       });
       if (coin) {
         coins[coin.id] = {
-          symbol: symbol,
-          isSupported: !coin.isSuspended
-        }
+          symbol,
+          isSupported: !coin.isSuspended,
+        };
         coinsUSA[coin.id] = {
-          symbol: symbol,
-          isSupported: !coin.isSuspended && coin.isSupportedInUS
-        }
+          symbol,
+          isSupported: !coin.isSuspended && coin.isSupportedInUS,
+        };
       }
     });
 
-    var fiat = {};
-    data.forEach(function(item) {
+    const fiat = {};
+    data.forEach((item) => {
       if (item.type === 'fiat') {
         fiat[item.id] = {
           symbol: item.code.toUpperCase(),
           sign: '', // deprecated
           precision: item.precision,
           minAmount: item.minAmount || 20,
-          maxAmount: item.maxAmount || 2200
+          maxAmount: item.maxAmount || 2200,
         };
       }
     });
 
     return {
-      coins: coins,
+      coins,
       coins_usa: coinsUSA,
-      fiat: fiat
+      fiat,
     };
   });
 }
 
 function getCountriesFromAPI() {
-  return axios.get('https://api.moonpay.io/v3/countries').then(function(response) {
-    var data = response.data;
+  return axios.get('https://api.moonpay.io/v3/countries').then((response) => {
+    const { data } = response;
     if (!data || !data.length) throw new Error('Bad moonpay response');
 
-    var document = data.filter(function(country) {
+    const document = data.filter((country) => {
       return country.supportedDocuments && country.supportedDocuments.length > 0;
-    }).map(function(country) {
+    }).map((country) => {
       return {
         code: country.alpha3,
         name: country.name,
-        supportedDocuments: country.supportedDocuments
-      }
+        supportedDocuments: country.supportedDocuments,
+      };
     });
 
-    var allowed = data.filter(function(country) {
+    const allowed = data.filter((country) => {
       return country.isAllowed;
-    }).map(function(country) {
-      var item = {};
+    }).map((country) => {
+      const item = {};
       item.code = country.alpha3;
       item.name = country.name;
       if (country.states) {
-        item.states = country.states.filter(function(state) {
+        item.states = country.states.filter((state) => {
           return state.isAllowed;
-        }).map(function(state) {
+        }).map((state) => {
           return {
             code: state.code,
-            name: state.name
+            name: state.name,
           };
         });
       }
@@ -94,18 +94,18 @@ function getCountriesFromAPI() {
     });
 
     return {
-      document: document,
-      allowed: allowed
+      document,
+      allowed,
     };
   });
 }
 
 function getFromCache(id) {
-  var collection = db().collection('moonpay');
+  const collection = db().collection('moonpay');
   return collection
-    .find({_id: id})
+    .find({ _id: id })
     .limit(1)
-    .next().then(function(item) {
+    .next().then((item) => {
       if (!item) return {};
       delete item.id;
       return item.data;
@@ -113,8 +113,8 @@ function getFromCache(id) {
 }
 
 module.exports = {
-  save: save,
-  getCurrenciesFromAPI: getCurrenciesFromAPI,
-  getCountriesFromAPI: getCountriesFromAPI,
-  getFromCache: getFromCache
+  save,
+  getCurrenciesFromAPI,
+  getCountriesFromAPI,
+  getFromCache,
 };

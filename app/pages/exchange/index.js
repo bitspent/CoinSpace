@@ -1,21 +1,21 @@
 'use strict';
 
-var Ractive = require('lib/ractive');
-var emitter = require('lib/emitter');
-var initShapeshift = require('./shapeshift');
-var initChangelly = require('./changelly');
-var initMoonpay = require('./moonpay');
-var moonpay = require('lib/moonpay');
-var getWallet = require('lib/wallet').getWallet;
-var showConfirmPurchase = require('widgets/modals/moonpay/confirm-purchase');
+const Ractive = require('lib/ractive');
+const emitter = require('lib/emitter');
+const initShapeshift = require('./shapeshift');
+const initChangelly = require('./changelly');
+const initMoonpay = require('./moonpay');
+const moonpay = require('lib/moonpay');
+const { getWallet } = require('lib/wallet');
+const showConfirmPurchase = require('widgets/modals/moonpay/confirm-purchase');
 
 module.exports = function(el) {
-  var ractive = new Ractive({
-    el: el,
+  const ractive = new Ractive({
+    el,
     template: require('./index.ract'),
   });
 
-  var exchanges = {
+  const exchanges = {
     changelly: initChangelly(ractive.find('#exchange_changelly')),
     shapeshift: initShapeshift(ractive.find('#exchange_shapeshift')),
     moonpay: initMoonpay(ractive.find('#exchange_moonpay')),
@@ -23,28 +23,28 @@ module.exports = function(el) {
       el: ractive.find('#exchange_none'),
       template: require('./choose.ract'),
       data: {
-        choose: choose,
+        choose,
         crypto: '',
         isSupportedMoonpay: false,
       },
     }),
   };
 
-  exchanges.none.on('moonpay', function() {
-    var wallet = getWallet();
-    var symbol = wallet.denomination;
-    moonpay.show(symbol.toLowerCase(), wallet.getNextAddress(), function() {
+  exchanges.none.on('moonpay', () => {
+    const wallet = getWallet();
+    const symbol = wallet.denomination;
+    moonpay.show(symbol.toLowerCase(), wallet.getNextAddress(), () => {
       showConfirmPurchase({ status: 'success' });
     });
   });
 
-  var currentExchange = exchanges.none;
+  let currentExchange = exchanges.none;
 
-  ractive.on('before-show', function() {
+  ractive.on('before-show', () => {
     setMoonpayButton();
     if (process.env.BUILD_PLATFORM === 'mas') return showExchange(exchanges.none);
 
-    var preferredExchange = window.localStorage.getItem('_cs_preferred_exchange');
+    const preferredExchange = window.localStorage.getItem('_cs_preferred_exchange');
     if (exchanges[preferredExchange]) {
       showExchange(exchanges[preferredExchange]);
     } else {
@@ -52,13 +52,13 @@ module.exports = function(el) {
     }
   });
 
-  ractive.on('before-hide', function() {
+  ractive.on('before-hide', () => {
     currentExchange.hide();
   });
 
   emitter.on('moonpay-init', setMoonpayButton);
 
-  emitter.on('set-exchange', function(exchangeName) {
+  emitter.on('set-exchange', (exchangeName) => {
     choose(exchangeName);
   });
 
@@ -68,14 +68,14 @@ module.exports = function(el) {
   }
 
   function setMoonpayButton() {
-    var wallet = getWallet();
-    var symbol = wallet.denomination;
+    const wallet = getWallet();
+    const symbol = wallet.denomination;
     exchanges.none.set('crypto', wallet.name);
     exchanges.none.set('isSupportedMoonpay', moonpay.isSupported(symbol) && wallet.getNextAddress());
   }
 
   function showExchange(exchange) {
-    setTimeout(function() {
+    setTimeout(() => {
       currentExchange.hide();
       exchange.show();
       currentExchange = exchange;

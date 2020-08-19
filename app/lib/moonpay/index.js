@@ -1,25 +1,25 @@
 'use strict';
 
-var request = require('lib/request');
-var urlRoot = window.urlRoot;
-var coins = {};
-var emitter = require('lib/emitter');
-var applePay = require('lib/apple-pay');
+const request = require('lib/request');
+const { urlRoot } = window;
+let coins = {};
+const emitter = require('lib/emitter');
+const applePay = require('lib/apple-pay');
 
-var hasHandledMobileSuccess = false;
-var apiKey = process.env.MOONPAY_API_KEY;
-var customer;
-var fiat;
-var countries = {document: [], allowed: []};
-var ipCountry;
+let hasHandledMobileSuccess = false;
+const apiKey = process.env.MOONPAY_API_KEY;
+let customer;
+let fiat;
+const countries = { document: [], allowed: [] };
+let ipCountry;
 
-emitter.on('handleOpenURL', function(url) {
+emitter.on('handleOpenURL', (url) => {
   url = url || '';
-  var matchAction = url.match(/action=([^&]+)/);
+  const matchAction = url.match(/action=([^&]+)/);
 
   if (matchAction && matchAction[1] === 'moonpay-3d-secure') {
-    var matchTxId = url.match(/transactionId=([^&]+)/);
-    var txId = matchTxId ? matchTxId[1] : '';
+    const matchTxId = url.match(/transactionId=([^&]+)/);
+    const txId = matchTxId ? matchTxId[1] : '';
 
     window.localStorage.setItem('_cs_moonpay_3d_secure', txId);
     hasHandledMobileSuccess = true;
@@ -38,20 +38,20 @@ emitter.on('wallet-reset', () => {
 function init() {
   return request({
     url: 'https://api.moonpay.io/v3/ip_address',
-    params: {apiKey: apiKey},
+    params: { apiKey },
     hideFlashError: true,
-  }).catch(function(error) {
+  }).catch((error) => {
     if (error.message === 'Network Error') return false;
     throw error;
-  }).then(function(data) {
+  }).then((data) => {
     if (data && data.isAllowed) {
       ipCountry = data.alpha3;
       return request({
         url: urlRoot + 'v1/moonpay/coins',
-        params: {country: data.alpha3},
+        params: { country: data.alpha3 },
       });
     }
-  }).then(function(data) {
+  }).then((data) => {
     if (!data) return;
     coins = data;
     emitter.emit('moonpay-init');
@@ -60,7 +60,7 @@ function init() {
 
 function loadFiat() {
   if (fiat) return Promise.resolve();
-  return request({url: urlRoot + 'v1/moonpay/fiat'}).then(function(data) {
+  return request({ url: urlRoot + 'v1/moonpay/fiat' }).then((data) => {
     fiat = data;
   }).catch(console.error);
 }
@@ -74,11 +74,11 @@ function getFiatById(id, field) {
 
 function getFiatList() {
   if (!fiat) return [];
-  return Object.keys(fiat).map(function(key) {
-    var item = fiat[key];
+  return Object.keys(fiat).map((key) => {
+    const item = fiat[key];
     item.id = key;
     return item;
-  }).sort(function(a, b) {
+  }).sort((a, b) => {
     return a.symbol > b.symbol ? 1 : -1;
   });
 }
@@ -88,7 +88,7 @@ function getCryptoSymbolById(id) {
 }
 
 function isSupported(symbol) {
-  return !!Object.keys(coins).find(function(key) {
+  return !!Object.keys(coins).find((key) => {
     return coins[key].symbol === symbol && coins[key].isSupported;
   });
 }
@@ -107,9 +107,9 @@ function signIn(email, securityCode) {
   return request({
     url: 'https://api.moonpay.io/v3/customers/email_login',
     method: 'post',
-    params: {apiKey: apiKey},
-    data: {email: email, securityCode: securityCode},
-  }).then(fixPhonegapCookies).catch(function(err) {
+    params: { apiKey },
+    data: { email, securityCode },
+  }).then(fixPhonegapCookies).catch((err) => {
     if (/Invalid body/.test(err.message)) {
       if (securityCode) throw new Error('invalid_security_code');
       throw new Error('invalid_email');
@@ -131,17 +131,18 @@ function limits() {
 function refreshToken() {
   return request({
     url: 'https://api.moonpay.io/v3/customers/refresh_token',
-    params: {apiKey: apiKey},
+    params: { apiKey },
     headers: getAuthorizationHeaders(),
   }).then(fixPhonegapCookies);
 }
 
 function fixPhonegapCookies(data) {
   if (process.env.BUILD_TYPE !== 'phonegap') return Promise.resolve(data);
-  return new Promise(function(resolve, reject) {
+  return new Promise((resolve, reject) => {
+    // eslint-disable-next-line no-undef
     cookieMaster.setCookieValue('https://api.moonpay.io', 'customerToken', '',
-      function() { resolve(data); },
-      function(err) { reject(err); });
+      () => { resolve(data); },
+      (err) => { reject(err); });
   });
 }
 
@@ -179,7 +180,7 @@ function updateCustomer(data) {
   return request({
     url: 'https://api.moonpay.io/v3/customers/me',
     method: 'patch',
-    data: data,
+    data,
     headers: getAuthorizationHeaders(),
   });
 }
@@ -198,8 +199,8 @@ function verifyPhoneNumber(code) {
 function loadCountries(type) {
   return request({
     url: urlRoot + 'v1/moonpay/countries',
-    params: {type: type},
-  }).then(function(data) {
+    params: { type },
+  }).then((data) => {
     if (!data) return;
     countries[type] = data;
   });
@@ -221,14 +222,15 @@ function getFiles() {
 }
 
 function uploadFile(file, type, country, side) {
-  var key;
+  let key;
   return request({
     url: 'https://api.moonpay.io/v3/files/s3_signed_request',
     params: {
-      apiKey: apiKey,
+      apiKey,
       fileType: file.type,
     },
-  }).then(function(data) {
+  }).then((data) => {
+    // eslint-disable-next-line prefer-destructuring
     key = data.key;
     return request({
       url: data.signedRequest,
@@ -238,15 +240,15 @@ function uploadFile(file, type, country, side) {
         'Content-Type': file.type,
       },
     });
-  }).then(function() {
+  }).then(() => {
     return request({
       url: 'https://api.moonpay.io/v3/files',
       method: 'post',
       data: {
-        key: key,
-        type: type,
-        country: country,
-        side: side,
+        key,
+        type,
+        country,
+        side,
       },
       headers: getAuthorizationHeaders(),
     });
@@ -258,7 +260,7 @@ function createCard(tokenId) {
     url: 'https://api.moonpay.io/v3/cards',
     method: 'post',
     data: {
-      tokenId: tokenId,
+      tokenId,
     },
     headers: getAuthorizationHeaders(),
   });
@@ -268,15 +270,15 @@ function getCards() {
   return request({
     url: 'https://api.moonpay.io/v3/cards',
     headers: getAuthorizationHeaders(),
-  }).then(function(cards) {
-    cards.forEach(function(card) {
+  }).then((cards) => {
+    cards.forEach((card) => {
       card.label = card.brand.toUpperCase() + '...x' + card.lastDigits;
     });
-    cards.sort(function(a, b) {
+    cards.sort((a, b) => {
       return (new Date(b.createdAt)).getTime() - (new Date(a.createdAt).getTime());
     });
     if (applePay.isApplePaySupported()) {
-      cards.unshift({type: 'applePay', label: 'Apple Pay'});
+      cards.unshift({ type: 'applePay', label: 'Apple Pay' });
     }
     return cards;
   });
@@ -291,7 +293,7 @@ function deleteCard(id) {
 }
 
 function createBankAccount(bankAccount) {
-  var data = { currencyCode: bankAccount.currencyCode.toLowerCase() };
+  const data = { currencyCode: bankAccount.currencyCode.toLowerCase() };
   if (data.currencyCode === 'eur') {
     data.iban = bankAccount.iban;
   } else if (data.currencyCode === 'gbp') {
@@ -301,7 +303,7 @@ function createBankAccount(bankAccount) {
   return request({
     url: 'https://api.moonpay.io/v3/bank_accounts',
     method: 'post',
-    data: data,
+    data,
     headers: getAuthorizationHeaders(),
   });
 }
@@ -310,9 +312,9 @@ function getBankAccounts(fiat) {
   return request({
     url: 'https://api.moonpay.io/v3/bank_accounts',
     headers: getAuthorizationHeaders(),
-  }).then(function(bankAccounts) {
-    bankAccounts.forEach(function(bankAccount) {
-      var fiatSymbol = getFiatById(bankAccount.currencyId, 'symbol');
+  }).then((bankAccounts) => {
+    bankAccounts.forEach((bankAccount) => {
+      const fiatSymbol = getFiatById(bankAccount.currencyId, 'symbol');
       if (fiatSymbol === 'EUR') {
         bankAccount.label = fiatSymbol + ' – ' + bankAccount.iban.substr(0, 8) + '...' + bankAccount.iban.substr(-4);
       } else if (fiatSymbol === 'GBP') {
@@ -322,11 +324,11 @@ function getBankAccounts(fiat) {
       bankAccount.type = 'bankAccount';
     });
     if (fiat) {
-      bankAccounts = bankAccounts.filter(function(bankAccount) {
+      bankAccounts = bankAccounts.filter((bankAccount) => {
         return bankAccount.fiatSymbol === fiat;
       });
     }
-    bankAccounts.sort(function(a, b) {
+    bankAccounts.sort((a, b) => {
       return (new Date(b.createdAt)).getTime() - (new Date(a.createdAt).getTime());
     });
     return bankAccounts;
@@ -342,7 +344,7 @@ function deleteBankAccount(id) {
 }
 
 function quote(currencyCode, baseCurrencyCode, baseCurrencyAmount, paymentMethod, areFeesIncluded) {
-  var pm = 'credit_debit_card';
+  let pm = 'credit_debit_card';
   if (paymentMethod && paymentMethod.type === 'bankAccount') {
     if (paymentMethod.fiatSymbol === 'EUR') {
       pm = 'sepa_bank_transfer';
@@ -353,11 +355,11 @@ function quote(currencyCode, baseCurrencyCode, baseCurrencyAmount, paymentMethod
   return request({
     url: 'https://api.moonpay.io/v3/currencies/' + currencyCode + '/quote',
     params: {
-      apiKey: apiKey,
-      baseCurrencyCode: baseCurrencyCode,
-      baseCurrencyAmount: baseCurrencyAmount,
+      apiKey,
+      baseCurrencyCode,
+      baseCurrencyAmount,
       paymentMethod: pm,
-      areFeesIncluded: areFeesIncluded,
+      areFeesIncluded,
     },
   });
 }
@@ -366,9 +368,9 @@ function rate(currencyCode, baseCurrencyCode) {
   return request({
     url: 'https://api.moonpay.io/v3/currencies/' + currencyCode + '/price',
     params: {
-      apiKey: apiKey,
+      apiKey,
     },
-  }).then(function(data) {
+  }).then((data) => {
     return data[baseCurrencyCode.toUpperCase()];
   });
 }
@@ -383,11 +385,11 @@ function createTx(data) {
         type: 'final',
         amount: data.baseCurrencyAmount,
       },
-      validateApplePayTransaction: validateApplePayTransaction,
-      callback: function(token) {
+      validateApplePayTransaction,
+      callback(token) {
         data.externalToken = {
           tokenProvider: 'apple_pay',
-          token: token,
+          token,
         };
         delete data.paymentMethod;
         return _createTx(data);
@@ -438,17 +440,17 @@ function getTxById(id) {
 }
 
 function open3dSecure(url) {
-  return new Promise(function(resolve) {
-    var width = 500;
-    var height = 600;
-    var options = 'width=' + width + ', ';
+  return new Promise((resolve) => {
+    const width = 500;
+    const height = 600;
+    let options = 'width=' + width + ', ';
     options += 'height=' + height + ', ';
     options += 'left=' + ((screen.width - width) / 2) + ', ';
     options += 'top=' + ((screen.height - height) / 2) + '';
 
     window.localStorage.removeItem('_cs_moonpay_3d_secure');
-    var popup = window.open(url, process.env.BUILD_TYPE === 'electron' ? '_modal' : '_blank', options);
-    var popupInterval = setInterval(function() {
+    const popup = window.open(url, process.env.BUILD_TYPE === 'electron' ? '_modal' : '_blank', options);
+    const popupInterval = setInterval(() => {
       if ((popup && popup.closed) || hasHandledMobileSuccess) {
         clearInterval(popupInterval);
         hasHandledMobileSuccess = false;
@@ -458,10 +460,10 @@ function open3dSecure(url) {
         return resolve(window.localStorage.getItem('_cs_moonpay_3d_secure'));
       }
     }, 250);
-  }).then(function(txId) {
+  }).then((txId) => {
     if (!txId) throw new Error('3d_failed');
     return getTxById(txId);
-  }).then(function(tx) {
+  }).then((tx) => {
     if (tx.status !== 'completed' && tx.status !== 'pending') throw new Error('3d_failed');
   });
 }
@@ -470,33 +472,33 @@ function validateApplePayTransaction(validationUrl) {
   return request({
     url: 'https://api.moonpay.io/v3/apple_pay/validate',
     method: 'post',
-    data: {validationUrl: validationUrl},
+    data: { validationUrl },
     headers: getAuthorizationHeaders(),
   });
 }
 
 function show(currencyCode, walletAddress, onSuccess) {
-  var baseUrl = process.env.MOONPAY_WIDGET_URL + '&';
+  let baseUrl = process.env.MOONPAY_WIDGET_URL + '&';
   // TODO handle moonpay transactionStatus=failed
-  var redirectURL =  'coinspace://?action=moonpay-success';
+  const redirectURL =  'coinspace://?action=moonpay-success';
 
-  var params = {
-    currencyCode: currencyCode,
-    walletAddress: walletAddress,
+  const params = {
+    currencyCode,
+    walletAddress,
     redirectURL: encodeURIComponent(redirectURL),
     feeBreakdown: false,
     enabledPaymentMethods: 'credit_debit_card,sepa_bank_transfer,gbp_bank_transfer',
   };
 
-  var queryString = Object.keys(params).map(function(key) {
+  const queryString = Object.keys(params).map((key) => {
     return key + '=' + params[key];
   }).join('&');
 
   baseUrl += queryString;
 
   window.localStorage.removeItem('_cs_moonpay_success');
-  var popup = window.open(baseUrl, '_blank');
-  var popupInterval = setInterval(function() {
+  const popup = window.open(baseUrl, '_blank');
+  const popupInterval = setInterval(() => {
     if ((popup && popup.closed) || hasHandledMobileSuccess) {
       clearInterval(popupInterval);
       hasHandledMobileSuccess = false;
@@ -510,39 +512,39 @@ function show(currencyCode, walletAddress, onSuccess) {
 }
 
 module.exports = {
-  init: init,
-  loadFiat: loadFiat,
-  getFiatById: getFiatById,
-  getFiatList: getFiatList,
-  getCryptoSymbolById: getCryptoSymbolById,
-  isSupported: isSupported,
-  isLogged: isLogged,
-  signIn: signIn,
-  limits: limits,
-  refreshToken: refreshToken,
-  setAccessToken: setAccessToken,
-  cleanAccessToken: cleanAccessToken,
-  getCustomer: getCustomer,
-  setCustomer: setCustomer,
-  cleanCustomer: cleanCustomer,
-  updateCustomer: updateCustomer,
-  verifyPhoneNumber: verifyPhoneNumber,
-  loadCountries: loadCountries,
-  getCountries: getCountries,
-  getIpCountry: getIpCountry,
-  getFiles: getFiles,
-  uploadFile: uploadFile,
-  createCard: createCard,
-  getCards: getCards,
-  deleteCard: deleteCard,
-  createBankAccount: createBankAccount,
-  getBankAccounts: getBankAccounts,
-  deleteBankAccount: deleteBankAccount,
-  quote: quote,
-  rate: rate,
-  createTx: createTx,
-  getTxs: getTxs,
-  open3dSecure: open3dSecure,
-  validateApplePayTransaction: validateApplePayTransaction,
-  show: show,
+  init,
+  loadFiat,
+  getFiatById,
+  getFiatList,
+  getCryptoSymbolById,
+  isSupported,
+  isLogged,
+  signIn,
+  limits,
+  refreshToken,
+  setAccessToken,
+  cleanAccessToken,
+  getCustomer,
+  setCustomer,
+  cleanCustomer,
+  updateCustomer,
+  verifyPhoneNumber,
+  loadCountries,
+  getCountries,
+  getIpCountry,
+  getFiles,
+  uploadFile,
+  createCard,
+  getCards,
+  deleteCard,
+  createBankAccount,
+  getBankAccounts,
+  deleteBankAccount,
+  quote,
+  rate,
+  createTx,
+  getTxs,
+  open3dSecure,
+  validateApplePayTransaction,
+  show,
 };
